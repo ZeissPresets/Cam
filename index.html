@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Webcam Resolution Enhancer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>AI Webcam Resolution Enhancer</h1>
+        
+        <div class="camera-controls">
+            <select id="cameraSelect" class="camera-select">
+                <option value="">Pilih Kamera...</option>
+            </select>
+            <button id="switchCamera" class="btn">Ganti Kamera</button>
+            <button id="toggleAdvanced" class="btn">Mode Advanced</button>
+        </div>
+        
+        <div class="advanced-controls hidden">
+            <h3>Kontrol Peningkatan</h3>
+            <div class="slider-container">
+                <label for="sharpness">Ketajaman:</label>
+                <input type="range" id="sharpness" min="0" max="200" value="100">
+                <span id="sharpnessValue">100%</span>
+            </div>
+            <div class="slider-container">
+                <label for="noiseReduction">Reduksi Noise:</label>
+                <input type="range" id="noiseReduction" min="0" max="100" value="50">
+                <span id="noiseValue">50%</span>
+            </div>
+            <div class="slider-container">
+                <label for="contrast">Kontras:</label>
+                <input type="range" id="contrast" min="0" max="200" value="100">
+                <span id="contrastValue">100%</span>
+            </div>
+            <div class="model-selection">
+                <label for="modelSelect">Model AI:</label>
+                <select id="modelSelect">
+                    <option value="auto">Auto (Rekomendasi)</option>
+                    <option value="superres">Super Resolution</option>
+                    <option value="denoise">Denoise & Sharpen</option>
+                    <option value="gan">GAN Enhancement</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="video-container">
+            <video id="video" autoplay playsinline></video>
+            <div class="focus-box" id="focusBox"></div>
+        </div>
+        
+        <div class="action-buttons">
+            <button id="capture" class="btn btn-primary">Ambil Foto</button>
+            <button id="toggleFocus" class="btn">Mode Fokus</button>
+        </div>
+        
+        <div class="results hidden">
+            <h2>Hasil</h2>
+            <div class="comparison">
+                <div class="image-container">
+                    <h3>Asli</h3>
+                    <canvas id="originalCanvas"></canvas>
+                    <div class="image-stats">
+                        <p>Resolusi: <span id="originalRes">-</span></p>
+                        <p>Ukuran File: <span id="originalSize">-</span></p>
+                    </div>
+                </div>
+                <div class="image-container">
+                    <h3>Enhanced</h3>
+                    <canvas id="enhancedCanvas"></canvas>
+                    <div class="image-stats">
+                        <p>Resolusi: <span id="enhancedRes">-</span></p>
+                        <p>Ukuran File: <span id="enhancedSize">-</span></p>
+                    </div>
+                </div>
+            </div>
+            <div class="enhancement-info">
+                <p>Model AI yang digunakan: <span id="modelUsed">-</span></p>
+                <p>Peningkatan resolusi: <span id="resolutionIncrease">-</span></p>
+                <p>Waktu pemrosesan: <span id="processingTime">-</span></p>
+            </div>
+            <div class="result-actions">
+                <button id="retake" class="btn">Ambil Ulang</button>
+                <button id="download" class="btn btn-primary">Download Hasil</button>
+            </div>
+        </div>
+        
+        <div class="loading hidden" id="loading">
+            <div class="spinner"></div>
+            <p>Meningkatkan resolusi...</p>
+            <div class="progress-bar">
+                <div class="progress"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="resolution.js"></script>
+</body>
+</html>
