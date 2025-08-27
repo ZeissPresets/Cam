@@ -1,83 +1,114 @@
-class WebcamApp {
+class RealTimeWebcamEnhancer {
     constructor() {
-        this.videoElement = document.getElementById('video');
+        this.originalVideo = document.getElementById('originalVideo');
+        this.enhancedVideo = document.getElementById('enhancedVideo');
         this.cameraSelect = document.getElementById('cameraSelect');
         this.switchCameraBtn = document.getElementById('switchCamera');
-        this.captureBtn = document.getElementById('capture');
-        this.retakeBtn = document.getElementById('retake');
-        this.downloadBtn = document.getElementById('download');
-        this.toggleAdvancedBtn = document.getElementById('toggleAdvanced');
-        this.toggleFocusBtn = document.getElementById('toggleFocus');
-        this.originalCanvas = document.getElementById('originalCanvas');
-        this.enhancedCanvas = document.getElementById('enhancedCanvas');
-        this.resultsSection = document.querySelector('.results');
-        this.advancedControls = document.querySelector('.advanced-controls');
-        this.loadingElement = document.getElementById('loading');
-        this.focusBox = document.getElementById('focusBox');
-        this.modelUsedElement = document.getElementById('modelUsed');
-        this.resolutionIncreaseElement = document.getElementById('resolutionIncrease');
-        this.processingTimeElement = document.getElementById('processingTime');
-        this.originalResElement = document.getElementById('originalRes');
-        this.enhancedResElement = document.getElementById('enhancedRes');
-        this.originalSizeElement = document.getElementById('originalSize');
-        this.enhancedSizeElement = document.getElementById('enhancedSize');
+        this.toggleEnhancementBtn = document.getElementById('toggleEnhancement');
+        this.captureBtn = document.getElementById('captureBtn');
+        this.toggleFullscreenBtn = document.getElementById('toggleFullscreen');
+        this.recordBtn = document.getElementById('recordBtn');
         
-        // Kontrol advanced
+        // Status elements
+        this.statusElement = document.getElementById('status');
+        this.processingTimeElement = document.getElementById('processingTime');
+        this.enhancementStatusElement = document.getElementById('enhancementStatus');
+        this.originalResolutionElement = document.getElementById('originalResolution');
+        this.enhancedResolutionElement = document.getElementById('enhancedResolution');
+        this.originalFpsElement = document.getElementById('originalFps');
+        this.enhancedFpsElement = document.getElementById('enhancedFps');
+        this.modelUsedElement = document.getElementById('modelUsed');
+        
+        // Controls
         this.sharpnessSlider = document.getElementById('sharpness');
-        this.noiseReductionSlider = document.getElementById('noiseReduction');
+        this.brightnessSlider = document.getElementById('brightness');
         this.contrastSlider = document.getElementById('contrast');
-        this.modelSelect = document.getElementById('modelSelect');
         this.sharpnessValue = document.getElementById('sharpnessValue');
-        this.noiseValue = document.getElementById('noiseValue');
+        this.brightnessValue = document.getElementById('brightnessValue');
         this.contrastValue = document.getElementById('contrastValue');
+        
+        // Gallery
+        this.galleryElement = document.getElementById('gallery');
+        this.imagesContainer = document.getElementById('imagesContainer');
         
         this.mediaStream = null;
         this.cameras = [];
         this.currentCameraIndex = 0;
-        this.focusMode = false;
-        this.advancedMode = false;
-        this.originalImageData = null;
-        this.enhancedImageData = null;
+        this.enhancementActive = false;
+        this.currentMode = 'standard';
+        this.socket = null;
+        
+        this.enhancedContext = this.enhancedVideo.getContext('2d');
+        this.originalFps = 0;
+        this.enhancedFps = 0;
+        this.lastOriginalFrameTime = 0;
+        this.lastEnhancedFrameTime = 0;
         
         this.initializeEventListeners();
+        this.initializeSocket();
         this.getCameras();
     }
     
-    // Inisialisasi event listeners
     initializeEventListeners() {
         this.switchCameraBtn.addEventListener('click', () => this.switchCamera());
+        this.toggleEnhancementBtn.addEventListener('click', () => this.toggleEnhancement());
         this.captureBtn.addEventListener('click', () => this.captureImage());
-        this.retakeBtn.addEventListener('click', () => this.retakePhoto());
-        this.downloadBtn.addEventListener('click', () => this.downloadImage());
-        this.toggleAdvancedBtn.addEventListener('click', () => this.toggleAdvancedMode());
-        this.toggleFocusBtn.addEventListener('click', () => this.toggleFocusMode());
-        this.cameraSelect.addEventListener('change', (e) => this.selectCamera(e.target.value));
+        this.toggleFullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
+        this.recordBtn.addEventListener('click', () => this.toggleRecording());
         
-        // Kontrol advanced
+        // Mode buttons
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                this.currentMode = e.target.dataset.mode;
+                this.updateStatus(`Mode diubah ke: ${this.getModeName(this.currentMode)}`);
+            });
+        });
+        
+        // Sliders
         this.sharpnessSlider.addEventListener('input', (e) => {
             this.sharpnessValue.textContent = `${e.target.value}%`;
         });
         
-        this.noiseReductionSlider.addEventListener('input', (e) => {
-            this.noiseValue.textContent = `${e.target.value}%`;
+        this.brightnessSlider.addEventListener('input', (e) => {
+            this.brightnessValue.textContent = `${e.target.value}%`;
         });
         
         this.contrastSlider.addEventListener('input', (e) => {
             this.contrastValue.textContent = `${e.target.value}%`;
         });
         
-        // Event untuk mode fokus
-        this.videoElement.addEventListener('click', (e) => {
-            if (this.focusMode) {
-                this.setFocusPoint(e);
-            }
+        // Handle window resize
+        window.addEventListener('resize', () => this.handleResize());
+    }
+    
+    initializeSocket() {
+        this.socket = io();
+        
+        this.socket.on('connect', () => {
+            this.updateStatus('Terhubung ke server');
+        });
+        
+        this.socket.on('disconnect', () => {
+            this.updateStatus('Terputus dari server');
+        });
+        
+        this.socket.on('enhanced-frame', (data) => {
+            this.displayEnhancedFrame(data);
+        });
+        
+        this.socket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error);
+            this.updateStatus('Koneksi error, menggunakan fallback client-side processing');
+            this.enhancementActive = false;
+            this.toggleEnhancementBtn.textContent = 'Aktifkan Peningkatan';
         });
     }
     
-    // Mendapatkan daftar kamera yang tersedia
     async getCameras() {
         try {
-            // Pertama-tama, minta izin untuk mengakses perangkat
+            // First get permission to access cameras
             await navigator.mediaDevices.getUserMedia({ video: true });
             
             const devices = await navigator.mediaDevices.enumerateDevices();
@@ -90,11 +121,10 @@ class WebcamApp {
             }
         } catch (error) {
             console.error('Error accessing cameras:', error);
-            alert('Tidak dapat mengakses kamera. Pastikan Anda memberikan izin untuk menggunakan kamera.');
+            this.updateStatus('Tidak dapat mengakses kamera. Pastikan izin diberikan.');
         }
     }
     
-    // Mengisi dropdown pemilihan kamera
     populateCameraSelect() {
         this.cameraSelect.innerHTML = '<option value="">Pilih Kamera...</option>';
         
@@ -104,19 +134,20 @@ class WebcamApp {
             option.text = camera.label || `Kamera ${index + 1}`;
             this.cameraSelect.appendChild(option);
         });
+        
+        this.cameraSelect.addEventListener('change', (e) => {
+            this.selectCamera(e.target.value);
+        });
     }
     
-    // Memilih kamera tertentu
     async selectCamera(deviceId) {
         if (!deviceId) return;
-        
         await this.startCamera(deviceId);
     }
     
-    // Berganti ke kamera berikutnya
     async switchCamera() {
         if (this.cameras.length <= 1) {
-            alert('Hanya satu kamera yang terdeteksi');
+            this.updateStatus('Hanya satu kamera yang tersedia');
             return;
         }
         
@@ -124,9 +155,8 @@ class WebcamApp {
         await this.startCamera(this.cameras[this.currentCameraIndex].deviceId);
     }
     
-    // Memulai kamera dengan deviceId tertentu
     async startCamera(deviceId) {
-        // Menghentikan stream yang sedang berjalan
+        // Stop current stream if exists
         if (this.mediaStream) {
             this.mediaStream.getTracks().forEach(track => track.stop());
         }
@@ -142,189 +172,272 @@ class WebcamApp {
             };
             
             this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-            this.videoElement.srcObject = this.mediaStream;
+            this.originalVideo.srcObject = this.mediaStream;
             
-            // Memilih opsi yang sesuai di dropdown
+            // Set camera select value
             this.cameraSelect.value = deviceId;
             
-            // Sembunyikan hasil jika ada
-            this.resultsSection.classList.add('hidden');
+            // Start processing frames
+            this.originalVideo.onloadedmetadata = () => {
+                this.enhancedVideo.width = this.originalVideo.videoWidth;
+                this.enhancedVideo.height = this.originalVideo.videoHeight;
+                
+                this.originalResolutionElement.textContent = 
+                    `${this.originalVideo.videoWidth}×${this.originalVideo.videoHeight}`;
+                this.enhancedResolutionElement.textContent = 
+                    `${this.enhancedVideo.width}×${this.enhancedVideo.height}`;
+                
+                this.updateStatus('Kamera siap');
+                this.requestFrame();
+            };
         } catch (error) {
             console.error('Error starting camera:', error);
-            alert('Tidak dapat memulai kamera. Pastikan perangkat mendukung akses kamera.');
+            this.updateStatus('Gagal mengakses kamera');
         }
     }
     
-    // Mengambil gambar dari video
+    requestFrame() {
+        if (this.originalVideo.srcObject) {
+            requestAnimationFrame(() => this.processFrame());
+        }
+    }
+    
+    async processFrame() {
+        // Calculate FPS for original video
+        const now = performance.now();
+        if (this.lastOriginalFrameTime > 0) {
+            this.originalFps = Math.round(1000 / (now - this.lastOriginalFrameTime));
+            this.originalFpsElement.textContent = this.originalFps;
+        }
+        this.lastOriginalFrameTime = now;
+        
+        if (this.enhancementActive && this.socket && this.socket.connected) {
+            // Send frame to server for processing via WebSocket
+            if (this.originalVideo.videoWidth > 0 && this.originalVideo.videoHeight > 0) {
+                // Create a temporary canvas to get image data
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = this.originalVideo.videoWidth;
+                tempCanvas.height = this.originalVideo.videoHeight;
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                tempCtx.drawImage(this.originalVideo, 0, 0);
+                const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                
+                // Send to server for processing
+                this.socket.emit('process-frame', {
+                    imageData: Array.from(imageData.data),
+                    width: imageData.width,
+                    height: imageData.height,
+                    enhancementType: this.currentMode
+                });
+            }
+        } else if (this.enhancementActive) {
+            // Fallback to client-side processing if server is not available
+            this.processFrameClientSide();
+        } else {
+            // Just copy the original video to enhanced canvas
+            this.enhancedContext.drawImage(this.originalVideo, 0, 0, 
+                this.enhancedVideo.width, this.enhancedVideo.height);
+            
+            // Calculate FPS for enhanced video
+            const enhancedNow = performance.now();
+            if (this.lastEnhancedFrameTime > 0) {
+                this.enhancedFps = Math.round(1000 / (enhancedNow - this.lastEnhancedFrameTime));
+                this.enhancedFpsElement.textContent = this.enhancedFps;
+            }
+            this.lastEnhancedFrameTime = enhancedNow;
+        }
+        
+        this.requestFrame();
+    }
+    
+    displayEnhancedFrame(data) {
+        if (data && data.imageData) {
+            const imageData = new ImageData(
+                new Uint8ClampedArray(data.imageData),
+                data.width,
+                data.height
+            );
+            
+            this.enhancedContext.putImageData(imageData, 0, 0);
+            
+            // Update info
+            this.modelUsedElement.textContent = data.modelName || 'Client-side';
+            
+            // Calculate FPS for enhanced video
+            const now = performance.now();
+            if (this.lastEnhancedFrameTime > 0) {
+                this.enhancedFps = Math.round(1000 / (now - this.lastEnhancedFrameTime));
+                this.enhancedFpsElement.textContent = this.enhancedFps;
+                this.processingTimeElement.textContent = `${Math.round(now - this.lastEnhancedFrameTime)}ms`;
+            }
+            this.lastEnhancedFrameTime = now;
+        }
+    }
+    
+    async processFrameClientSide() {
+        try {
+            const startTime = performance.now();
+            
+            // Draw original video to canvas
+            this.enhancedContext.drawImage(this.originalVideo, 0, 0, 
+                this.enhancedVideo.width, this.enhancedVideo.height);
+            
+            // Get image data for processing
+            const imageData = this.enhancedContext.getImageData(
+                0, 0, this.enhancedVideo.width, this.enhancedVideo.height
+            );
+            
+            // Apply enhancement based on current mode
+            let enhancedImageData;
+            switch (this.currentMode) {
+                case 'super':
+                    enhancedImageData = await applySuperResolution(imageData, 
+                        parseInt(this.sharpnessSlider.value),
+                        parseInt(this.contrastSlider.value)
+                    );
+                    break;
+                case '200mp':
+                    enhancedImageData = await apply200MPEnhancement(imageData);
+                    break;
+                case 'night':
+                    enhancedImageData = await applyNightVision(imageData, 
+                        parseInt(this.brightnessSlider.value)
+                    );
+                    break;
+                case 'portrait':
+                    enhancedImageData = await applyPortraitEnhancement(imageData,
+                        parseInt(this.sharpnessSlider.value)
+                    );
+                    break;
+                default:
+                    enhancedImageData = await applyStandardEnhancement(imageData,
+                        parseInt(this.sharpnessSlider.value),
+                        parseInt(this.brightnessSlider.value),
+                        parseInt(this.contrastSlider.value)
+                    );
+            }
+            
+            // Put enhanced image data back to canvas
+            this.enhancedContext.putImageData(enhancedImageData, 0, 0);
+            
+            // Calculate FPS and processing time
+            const endTime = performance.now();
+            this.enhancedFps = Math.round(1000 / (endTime - this.lastEnhancedFrameTime));
+            this.enhancedFpsElement.textContent = this.enhancedFps;
+            this.processingTimeElement.textContent = `${Math.round(endTime - startTime)}ms`;
+            this.lastEnhancedFrameTime = endTime;
+            
+            this.modelUsedElement.textContent = this.getModeName(this.currentMode);
+        } catch (error) {
+            console.error('Client-side processing error:', error);
+        }
+    }
+    
+    toggleEnhancement() {
+        this.enhancementActive = !this.enhancementActive;
+        
+        if (this.enhancementActive) {
+            this.toggleEnhancementBtn.textContent = 'Nonaktifkan Peningkatan';
+            this.enhancementStatusElement.textContent = 'Aktif';
+            this.updateStatus('Peningkatan AI diaktifkan');
+        } else {
+            this.toggleEnhancementBtn.textContent = 'Aktifkan Peningkatan';
+            this.enhancementStatusElement.textContent = 'Tidak aktif';
+            this.updateStatus('Peningkatan AI dinonaktifkan');
+        }
+    }
+    
     captureImage() {
-        const videoWidth = this.videoElement.videoWidth;
-        const videoHeight = this.videoElement.videoHeight;
+        if (!this.enhancementActive) {
+            alert('Aktifkan peningkatan AI terlebih dahulu!');
+            return;
+        }
         
-        // Mengatur ukuran canvas
-        this.originalCanvas.width = videoWidth;
-        this.originalCanvas.height = videoHeight;
-        this.enhancedCanvas.width = videoWidth;
-        this.enhancedCanvas.height = videoHeight;
+        // Create a link to download the enhanced image
+        const link = document.createElement('a');
+        link.download = `ai-enhanced-${new Date().getTime()}.png`;
+        link.href = this.enhancedVideo.toDataURL('image/png');
+        link.click();
         
-        // Menggambar frame video ke canvas
-        const context = this.originalCanvas.getContext('2d');
-        context.drawImage(this.videoElement, 0, 0, videoWidth, videoHeight);
+        // Add to gallery
+        this.addToGallery(link.href);
         
-        // Mendapatkan data gambar
-        this.originalImageData = context.getImageData(0, 0, videoWidth, videoHeight);
+        this.updateStatus('Foto disimpan');
+    }
+    
+    addToGallery(imageUrl) {
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.alt = 'Enhanced image';
         
-        // Menampilkan informasi resolusi asli
-        this.originalResElement.textContent = `${videoWidth} × ${videoHeight}`;
-        
-        // Menampilkan loading
-        this.showLoading(true);
-        
-        // Mendapatkan parameter peningkatan
-        const enhanceParams = {
-            sharpness: parseInt(this.sharpnessSlider.value),
-            noiseReduction: parseInt(this.noiseReductionSlider.value),
-            contrast: parseInt(this.contrastSlider.value),
-            model: this.modelSelect.value
+        this.imagesContainer.appendChild(img);
+        this.galleryElement.classList.remove('hidden');
+    }
+    
+    toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            this.enhancedVideo.requestFullscreen().catch(err => {
+                console.error('Error attempting to enable fullscreen:', err);
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    }
+    
+    toggleRecording() {
+        this.updateStatus('Fitur perekaman video dalam pengembangan');
+        // Video recording functionality would be implemented here
+    }
+    
+    handleResize() {
+        // Adjust canvas size if needed when window is resized
+        if (this.originalVideo.videoWidth > 0 && this.originalVideo.videoHeight > 0) {
+            this.enhancedVideo.width = this.originalVideo.videoWidth;
+            this.enhancedVideo.height = this.originalVideo.videoHeight;
+        }
+    }
+    
+    updateStatus(message) {
+        this.statusElement.textContent = message;
+        console.log(message);
+    }
+    
+    getModeName(mode) {
+        const modeNames = {
+            'standard': 'Standard HD',
+            'super': 'Super Resolution',
+            '200mp': '200MP Enhancement',
+            'night': 'Night Vision',
+            'portrait': 'Portrait Enhancement'
         };
         
-        // Memproses peningkatan resolusi
-        this.enhanceResolution(this.originalImageData, enhanceParams)
-            .then(result => {
-                this.enhancedImageData = result.imageData;
-                
-                // Menampilkan gambar yang telah ditingkatkan
-                const enhancedContext = this.enhancedCanvas.getContext('2d');
-                enhancedContext.putImageData(this.enhancedImageData, 0, 0);
-                
-                // Menampilkan informasi peningkatan
-                this.modelUsedElement.textContent = result.modelName;
-                this.resolutionIncreaseElement.textContent = result.resolutionIncrease;
-                this.processingTimeElement.textContent = `${result.processingTime}ms`;
-                this.enhancedResElement.textContent = `${this.enhancedCanvas.width} × ${this.enhancedCanvas.height}`;
-                
-                // Menampilkan perkiraan ukuran file
-                this.estimateFileSizes();
-                
-                // Menampilkan hasil
-                this.showResults();
-                
-                // Menyembunyikan loading
-                this.showLoading(false);
-            })
-            .catch(error => {
-                console.error('Error enhancing image:', error);
-                alert('Terjadi kesalahan saat meningkatkan resolusi gambar.');
-                this.showLoading(false);
-            });
-    }
-    
-    // Meningkatkan resolusi gambar menggunakan resolution.js
-    async enhanceResolution(imageData, params) {
-        return await enhanceImageResolution(imageData, params);
-    }
-    
-    // Memperkirakan ukuran file
-    estimateFileSizes() {
-        // Simulasi perkiraan ukuran file
-        const originalSize = Math.round(this.originalCanvas.width * this.originalCanvas.height * 0.0003);
-        const enhancedSize = Math.round(this.enhancedCanvas.width * this.enhancedCanvas.height * 0.0004);
-        
-        this.originalSizeElement.textContent = `${originalSize} KB`;
-        this.enhancedSizeElement.textContent = `${enhancedSize} KB`;
-    }
-    
-    // Menampilkan hasil
-    showResults() {
-        this.resultsSection.classList.remove('hidden');
-    }
-    
-    // Mengambil foto ulang
-    retakePhoto() {
-        this.resultsSection.classList.add('hidden');
-    }
-    
-    // Mengunduh gambar hasil
-    downloadImage() {
-        if (!this.enhancedImageData) return;
-        
-        const link = document.createElement('a');
-        link.download = 'enhanced-image.png';
-        link.href = this.enhancedCanvas.toDataURL('image/png');
-        link.click();
-    }
-    
-    // Menampilkan/menyembunyikan loading
-    showLoading(show) {
-        if (show) {
-            this.loadingElement.classList.remove('hidden');
-            this.updateProgress(0);
-            
-            // Simulasi progress bar
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += Math.random() * 10;
-                if (progress >= 100) {
-                    progress = 100;
-                    clearInterval(interval);
-                }
-                this.updateProgress(progress);
-            }, 200);
-        } else {
-            this.loadingElement.classList.add('hidden');
-        }
-    }
-    
-    // Memperbarui progress bar
-    updateProgress(percent) {
-        const progressBar = document.querySelector('.progress');
-        if (progressBar) {
-            progressBar.style.width = `${percent}%`;
-        }
-    }
-    
-    // Mengaktifkan/menonaktifkan mode advanced
-    toggleAdvancedMode() {
-        this.advancedMode = !this.advancedMode;
-        if (this.advancedMode) {
-            this.advancedControls.classList.remove('hidden');
-            this.toggleAdvancedBtn.textContent = 'Sembunyikan Advanced';
-        } else {
-            this.advancedControls.classList.add('hidden');
-            this.toggleAdvancedBtn.textContent = 'Mode Advanced';
-        }
-    }
-    
-    // Mengaktifkan/menonaktifkan mode fokus
-    toggleFocusMode() {
-        this.focusMode = !this.focusMode;
-        if (this.focusMode) {
-            this.focusBox.classList.add('visible');
-            this.toggleFocusBtn.textContent = 'Nonaktifkan Fokus';
-        } else {
-            this.focusBox.classList.remove('visible');
-            this.toggleFocusBtn.textContent = 'Mode Fokus';
-        }
-    }
-    
-    // Menetapkan titik fokus
-    setFocusPoint(event) {
-        const rect = this.videoElement.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-        
-        // Pindahkan kotak fokus ke titik yang diklik
-        this.focusBox.style.left = `${x}px`;
-        this.focusBox.style.top = `${y}px`;
-        
-        // Simulasi efek fokus (dalam implementasi nyata, ini akan mengatur fokus kamera)
-        this.focusBox.style.borderColor = '#2ecc71';
-        setTimeout(() => {
-            this.focusBox.style.borderColor = 'rgba(255, 255, 255, 0.8)';
-        }, 300);
+        return modeNames[mode] || 'Unknown Mode';
     }
 }
 
-// Inisialisasi aplikasi ketika halaman dimuat
+// Initialize the application when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    new WebcamApp();
+    new RealTimeWebcamEnhancer();
 });
+
+// Client-side enhancement functions (fallback when server is not available)
+async function applyStandardEnhancement(imageData, sharpness, brightness, contrast) {
+    return enhanceImageResolution(imageData, 'standard', sharpness, brightness, contrast);
+}
+
+async function applySuperResolution(imageData, sharpness, contrast) {
+    return enhanceImageResolution(imageData, 'super', sharpness, 100, contrast);
+}
+
+async function apply200MPEnhancement(imageData) {
+    return enhanceTo200MP(imageData);
+}
+
+async function applyNightVision(imageData, brightness) {
+    return enhanceImageResolution(imageData, 'night', 100, brightness, 100);
+}
+
+async function applyPortraitEnhancement(imageData, sharpness) {
+    return enhanceImageResolution(imageData, 'portrait', sharpness, 100, 100);
+}

@@ -3,100 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Webcam Resolution Enhancer</title>
+    <title>Real-Time AI Webcam Enhancer</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1>AI Webcam Resolution Enhancer</h1>
+        <header>
+            <h1>Real-Time AI Webcam Enhancer</h1>
+            <p>Tingkatkan kualitas webcam secara real-time dengan teknologi AI</p>
+        </header>
         
-        <div class="camera-controls">
-            <select id="cameraSelect" class="camera-select">
-                <option value="">Pilih Kamera...</option>
-            </select>
-            <button id="switchCamera" class="btn">Ganti Kamera</button>
-            <button id="toggleAdvanced" class="btn">Mode Advanced</button>
-        </div>
-        
-        <div class="advanced-controls hidden">
-            <h3>Kontrol Peningkatan</h3>
-            <div class="slider-container">
-                <label for="sharpness">Ketajaman:</label>
-                <input type="range" id="sharpness" min="0" max="200" value="100">
-                <span id="sharpnessValue">100%</span>
-            </div>
-            <div class="slider-container">
-                <label for="noiseReduction">Reduksi Noise:</label>
-                <input type="range" id="noiseReduction" min="0" max="100" value="50">
-                <span id="noiseValue">50%</span>
-            </div>
-            <div class="slider-container">
-                <label for="contrast">Kontras:</label>
-                <input type="range" id="contrast" min="0" max="200" value="100">
-                <span id="contrastValue">100%</span>
-            </div>
-            <div class="model-selection">
-                <label for="modelSelect">Model AI:</label>
-                <select id="modelSelect">
-                    <option value="auto">Auto (Rekomendasi)</option>
-                    <option value="superres">Super Resolution</option>
-                    <option value="denoise">Denoise & Sharpen</option>
-                    <option value="gan">GAN Enhancement</option>
+        <div class="controls">
+            <div class="camera-controls">
+                <select id="cameraSelect" class="camera-select">
+                    <option value="">Pilih Kamera...</option>
                 </select>
+                <button id="switchCamera" class="btn">Ganti Kamera</button>
+                <button id="toggleEnhancement" class="btn btn-primary">Aktifkan Peningkatan</button>
             </div>
-        </div>
-        
-        <div class="video-container">
-            <video id="video" autoplay playsinline></video>
-            <div class="focus-box" id="focusBox"></div>
-        </div>
-        
-        <div class="action-buttons">
-            <button id="capture" class="btn btn-primary">Ambil Foto</button>
-            <button id="toggleFocus" class="btn">Mode Fokus</button>
-        </div>
-        
-        <div class="results hidden">
-            <h2>Hasil</h2>
-            <div class="comparison">
-                <div class="image-container">
-                    <h3>Asli</h3>
-                    <canvas id="originalCanvas"></canvas>
-                    <div class="image-stats">
-                        <p>Resolusi: <span id="originalRes">-</span></p>
-                        <p>Ukuran File: <span id="originalSize">-</span></p>
+            
+            <div class="enhancement-controls">
+                <h3>Mode Peningkatan</h3>
+                <div class="mode-buttons">
+                    <button class="mode-btn active" data-mode="standard">Standard HD</button>
+                    <button class="mode-btn" data-mode="super">Super Resolution</button>
+                    <button class="mode-btn" data-mode="200mp">200MP Mode</button>
+                    <button class="mode-btn" data-mode="night">Night Vision</button>
+                    <button class="mode-btn" data-mode="portrait">Portrait Enhancement</button>
+                </div>
+                
+                <div class="sliders">
+                    <div class="slider-container">
+                        <label for="sharpness">Ketajaman: <span id="sharpnessValue">100%</span></label>
+                        <input type="range" id="sharpness" min="0" max="200" value="100">
+                    </div>
+                    
+                    <div class="slider-container">
+                        <label for="brightness">Kecerahan: <span id="brightnessValue">100%</span></label>
+                        <input type="range" id="brightness" min="0" max="200" value="100">
+                    </div>
+                    
+                    <div class="slider-container">
+                        <label for="contrast">Kontras: <span id="contrastValue">100%</span></label>
+                        <input type="range" id="contrast" min="0" max="200" value="100">
                     </div>
                 </div>
-                <div class="image-container">
-                    <h3>Enhanced</h3>
-                    <canvas id="enhancedCanvas"></canvas>
-                    <div class="image-stats">
-                        <p>Resolusi: <span id="enhancedRes">-</span></p>
-                        <p>Ukuran File: <span id="enhancedSize">-</span></p>
-                    </div>
-                </div>
-            </div>
-            <div class="enhancement-info">
-                <p>Model AI yang digunakan: <span id="modelUsed">-</span></p>
-                <p>Peningkatan resolusi: <span id="resolutionIncrease">-</span></p>
-                <p>Waktu pemrosesan: <span id="processingTime">-</span></p>
-            </div>
-            <div class="result-actions">
-                <button id="retake" class="btn">Ambil Ulang</button>
-                <button id="download" class="btn btn-primary">Download Hasil</button>
             </div>
         </div>
         
-        <div class="loading hidden" id="loading">
-            <div class="spinner"></div>
-            <p>Meningkatkan resolusi...</p>
-            <div class="progress-bar">
-                <div class="progress"></div>
+        <div class="video-comparison">
+            <div class="video-container">
+                <h3>Kamera Asli</h3>
+                <video id="originalVideo" autoplay playsinline muted></video>
+                <div class="video-stats">
+                    <span>Resolusi: <span id="originalResolution">-</span></span>
+                    <span>FPS: <span id="originalFps">-</span></span>
+                </div>
+            </div>
+            
+            <div class="video-container">
+                <h3>Hasil Peningkatan AI</h3>
+                <canvas id="enhancedVideo"></canvas>
+                <div class="video-stats">
+                    <span>Resolusi: <span id="enhancedResolution">-</span></span>
+                    <span>FPS: <span id="enhancedFps">-</span></span>
+                    <span>Model: <span id="modelUsed">-</span></span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="actions">
+            <button id="captureBtn" class="btn btn-secondary">Ambil Foto</button>
+            <button id="toggleFullscreen" class="btn">Layar Penuh</button>
+            <button id="recordBtn" class="btn btn-danger">Rekam Video</button>
+        </div>
+        
+        <div class="gallery hidden" id="gallery">
+            <h3>Galeri Foto</h3>
+            <div class="images-container" id="imagesContainer"></div>
+        </div>
+        
+        <div class="status-bar">
+            <div class="status-item">
+                <span class status-label>Status:</span>
+                <span class="status-value" id="status">Memuat...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Pemrosesan:</span>
+                <span class="status-value" id="processingTime">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Enhancement:</span>
+                <span class="status-value" id="enhancementStatus">Tidak aktif</span>
             </div>
         </div>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script src="script.js"></script>
-    <script src="resolution.js"></script>
 </body>
 </html>
